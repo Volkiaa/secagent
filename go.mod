@@ -9,6 +9,8 @@ require (
 	golang.org/x/sys v0.31.0
 )
 
+replace golang.org/x/sys => golang.org/x/sys v0.31.0
+
 require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
