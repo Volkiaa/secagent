@@ -54,13 +54,13 @@ jobs:
             -o /tmp/gitleaks && chmod +x /tmp/gitleaks && sudo mv /tmp/gitleaks /usr/local/bin/
           
           # Install semgrep
-          pip install semgrep
+          pip3 install semgrep
           
           # Install trivy
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
           
           # Install checkov
-          pip install checkov
+          pip3 install checkov
       
       - name: Run secagent scan
         run: |
