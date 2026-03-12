@@ -1,11 +1,11 @@
 # secagent - All-in-One Security Scanner
 # Includes: secagent + osv-scanner + gitleaks + semgrep + trivy + checkov
 
-FROM golang:1.21-bookworm
+FROM golang:1.22-bookworm
 
 LABEL maintainer="secagent-team"
 LABEL description="Developer-First Security Scanner - 5-in-1 unified security scanning"
-LABEL version="0.4.0"
+LABEL version="0.4.1"
 
 # Install Python and pip for semgrep/checkov
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -40,8 +40,16 @@ RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/
 # Install checkov
 RUN pip3 install --no-cache-dir checkov
 
-# Create cache directory
-RUN mkdir -p /root/.secagent/cache
+# Create cache directory and set permissions
+RUN mkdir -p /root/.secagent/cache && \
+    chmod -R 755 /root/.secagent
+
+# Create non-root user for security
+RUN useradd -r -s /bin/false secagent && \
+    chown -R secagent:secagent /root/.secagent
+
+# Switch to non-root user
+USER secagent
 
 # Default command
 ENTRYPOINT ["secagent"]
