@@ -1,0 +1,68 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  security-scan:
+    name: secagent Security Scan
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Download secagent
+        run: |
+          curl -sL https://github.com/secagent/secagent/releases/latest/download/secagent-linux-amd64 -o secagent
+          chmod +x secagent
+          sudo mv secagent /usr/local/bin/
+      
+      - name: Download SARIF converter
+        run: |
+          curl -sL https://raw.githubusercontent.com/secagent/secagent/main/scripts/json-to-sarif.py -o json-to-sarif.py
+      
+      - name: Run secagent scan
+        run: |
+          secagent scan --all . --format json --output secagent-results.json
+      
+      - name: Upload JSON results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: secagent-results
+          path: secagent-results.json
+          retention-days: 30
+      
+      - name: Convert to SARIF
+        if: always()
+        run: |
+          python3 json-to-sarif.py secagent-results.json secagent-results.sarif
+      
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: secagent-results.sarif
+        continue-on-error: true
+      
+      - name: Print summary
+        if: always()
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          secagent scan --all . 2>&1 | head -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

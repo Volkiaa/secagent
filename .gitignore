@@ -1,0 +1,36 @@
+# Binaries
+secagent
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+secagent.test
+
+# Test files
+*.test
+*.out
+
+# Cache
+cache/
+*.cache
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+secagent*

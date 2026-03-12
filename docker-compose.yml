@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  secagent:
+    image: secagent/secagent:latest
+    build: .
+    volumes:
+      # Mount your project to scan
+      - ./project-to-scan:/app/project:ro
+      # Persist cache between runs
+      - secagent-cache:/root/.secagent/cache
+      # Mount config if you have one
+      - ./config.yaml:/root/.secagent/config.yaml:ro
+    working_dir: /app/project
+    command: ["scan", "--all", "."]
+
+volumes:
+  secagent-cache:

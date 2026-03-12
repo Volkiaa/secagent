@@ -1,0 +1,50 @@
+# secagent Configuration Example
+# Copy to ~/.secagent/config.yaml
+
+# Enable/disable scanners
+scanners:
+  osv-scanner: true
+  gitleaks: true
+  semgrep: true
+  trivy: true
+  checkov: true
+
+# Fail CI on severity threshold
+thresholds:
+  fail_on: critical
+  warn_on: high
+
+# Output settings
+output:
+  format: table  # table, json, markdown
+  colors: true
+  verbose: false
+
+# Caching
+cache:
+  enabled: true
+  ttl: 24h  # Cache validity period
+
+# Ignore rules
+ignore:
+  # Ignore specific rules (supports wildcards)
+  rules:
+    # - "CKV_AWS_IAM_*"
+    # - "python.lang.security.audit.md5*"
+  
+  # Ignore files by glob pattern
+  files:
+    # - "**/*.test.py"
+    # - "vendor/**"
+    # - "**/*.min.js"
+  
+  # Ignore by severity
+  severities:
+    # - "low"
+    # - "info"
+  
+  # Ignore directories
+  paths:
+    # - "test/**"
+    # - "examples/**"
+    # - "docs/**"
