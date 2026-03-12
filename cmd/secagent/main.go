@@ -43,6 +43,7 @@ var (
 	configFile      string
 	diffTarget      string
 	noCache         bool
+	showIgnored     bool
 )
 
 func main() {
@@ -277,6 +278,7 @@ func init() {
 	scanCmd.Flags().StringVar(&configFile, "config", "", "Config file path")
 	scanCmd.Flags().StringVar(&diffTarget, "diff", "", "Scan only changed files since commit (e.g., HEAD~1, main)")
 	scanCmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable caching")
+	scanCmd.Flags().BoolVar(&showIgnored, "show-ignored", false, "Show auto-ignored findings (false positives)")
 
 	// Config subcommands
 	configCmd.AddCommand(configInitCmd)

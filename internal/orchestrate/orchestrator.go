@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/secagent/secagent/internal/cache"
+	"github.com/secagent/secagent/internal/confidence"
 	"github.com/secagent/secagent/internal/dedup"
 	"github.com/secagent/secagent/internal/diff"
 	"github.com/secagent/secagent/internal/filter"
@@ -206,6 +207,14 @@ func (o *Orchestrator) Scan(ctx context.Context, target string) (types.ScanResul
 
 	// Deduplicate findings from multiple scanners
 	result.Findings = dedup.Deduplicate(result.Findings)
+
+	// Automated triage - add confidence scores and auto-ignore false positives
+	result.Findings = confidence.TriageFindings(result.Findings)
+	
+	// Print triage summary in verbose mode
+	if o.config != nil && o.config.Output.Verbose {
+		confidence.PrintTriageSummary(result.Findings)
+	}
 
 	return result, nil
 }

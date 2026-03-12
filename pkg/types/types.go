@@ -45,21 +45,23 @@ type Location struct {
 
 // Finding represents a unified security finding
 type Finding struct {
-	ID          string                 `json:"id"`
-	Scanner     string                 `json:"scanner"`
-	Type        FindingType            `json:"type"`
-	Severity    Severity               `json:"severity"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description"`
-	Location    Location               `json:"location"`
-	Evidence    string                 `json:"evidence,omitempty"`
-	CVE         string                 `json:"cve,omitempty"`
-	CWE         string                 `json:"cwe,omitempty"`
-	CVSS        float64                `json:"cvss,omitempty"`
-	Fix         string                 `json:"fix,omitempty"`
-	References  []string               `json:"references,omitempty"`
-	Confidence  Confidence             `json:"confidence,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	ID              string                 `json:"id"`
+	Scanner         string                 `json:"scanner"`
+	Type            FindingType            `json:"type"`
+	Severity        Severity               `json:"severity"`
+	Title           string                 `json:"title"`
+	Description     string                 `json:"description"`
+	Location        Location               `json:"location"`
+	Evidence        string                 `json:"evidence,omitempty"`
+	CVE             string                 `json:"cve,omitempty"`
+	CWE             string                 `json:"cwe,omitempty"`
+	CVSS            float64                `json:"cvss,omitempty"`
+	Fix             string                 `json:"fix,omitempty"`
+	References      []string               `json:"references,omitempty"`
+	Confidence      Confidence             `json:"confidence,omitempty"`
+	ConfidenceScore int                    `json:"confidence_score,omitempty"` // 1-5 scale
+	AutoIgnored     bool                   `json:"auto_ignored,omitempty"`     // Auto-ignored as false positive
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // ScanResult represents the result of a scan operation

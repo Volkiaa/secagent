@@ -67,6 +67,11 @@ func (f *TableFormatter) Format(result types.ScanResult) (string, error) {
 	sb.WriteString("\n\n")
 
 	for i, finding := range result.Findings {
+		// Skip auto-ignored findings in normal output
+		if finding.AutoIgnored {
+			continue
+		}
+		
 		sb.WriteString(fmt.Sprintf("[%d] %s\n", i+1, finding.Title))
 		// Show merged scanners if available
 		scannerStr := ""
@@ -91,6 +96,17 @@ func (f *TableFormatter) Format(result types.ScanResult) (string, error) {
 		}
 		sb.WriteString(fmt.Sprintf("    Type:     %s\n", finding.Type))
 		sb.WriteString(fmt.Sprintf("    Severity: %s\n", finding.Severity))
+		
+		// Show confidence score
+		if finding.ConfidenceScore > 0 {
+			confidenceEmoji := "⚪"
+			if finding.ConfidenceScore >= 4 {
+				confidenceEmoji = "🟢"
+			} else if finding.ConfidenceScore <= 2 {
+				confidenceEmoji = "🔴"
+			}
+			sb.WriteString(fmt.Sprintf("    Confidence: %s (%d/5)\n", confidenceEmoji, finding.ConfidenceScore))
+		}
 		if finding.CVE != "" {
 			sb.WriteString(fmt.Sprintf("    CVE:      %s\n", finding.CVE))
 		}
