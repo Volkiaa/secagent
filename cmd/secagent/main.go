@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,8 @@ import (
 	"github.com/secagent/secagent/internal/output"
 	"github.com/secagent/secagent/pkg/types"
 	"github.com/secagent/secagent/internal/diff"
+	"github.com/secagent/secagent/internal/blastradius"
+	"github.com/secagent/secagent/internal/timeline"
 	"github.com/secagent/secagent/scanners"
 	"github.com/secagent/secagent/scanners/checkov"
 	"github.com/secagent/secagent/scanners/gitleaks"
@@ -63,6 +66,8 @@ secagent scan ./repo    # That's it. That's the product.`,
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(installHooksCmd)
+	rootCmd.AddCommand(blastRadiusCmd)
+	rootCmd.AddCommand(timelineCmd)
 
 	// Execute
 	if err := rootCmd.Execute(); err != nil {
@@ -442,4 +447,152 @@ func severityLevel(s types.Severity) int {
 func getGoVersion() string {
 	return "go1.21+"
 }
-// Test comment
+
+// Blast Radius Command
+var blastRadiusCmd = &cobra.Command{
+	Use:   "blast-radius [secret] [repo]",
+	Short: "Analyze the blast radius of an exposed secret",
+	Long: `Analyze the blast radius of an exposed secret in a git repository.
+
+Shows exposure window, affected commits, authors, files, and provides remediation recommendations.
+
+Examples:
+  secagent blast-radius AKIAIOSFODNN7EXAMPLE .
+  secagent blast-radius sk_live_abc123 ./my-repo`,
+	Args: cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		secret := args[0]
+		repoPath := args[1]
+
+		if repoPath == "." {
+			var err error
+			repoPath, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
+			}
+		}
+
+		report, err := blastradius.Analyze(repoPath, secret)
+		if err != nil {
+			return fmt.Errorf("analysis failed: %w", err)
+		}
+
+		// Print report
+		fmt.Println("\n🔴 BLAST RADIUS REPORT")
+		fmt.Println(strings.Repeat("=", 60))
+		fmt.Printf("Secret Type:    %s\n", report.SecretType)
+		fmt.Printf("Secret Value:   %s\n", report.SecretValue)
+		fmt.Printf("Exposure:       %d days (%s to %s)\n", 
+			report.ExposureDays,
+			report.FirstSeen.Format("2006-01-02"),
+			report.LastSeen.Format("2006-01-02"))
+		fmt.Printf("Risk Score:     %.1f/10\n\n", report.RiskScore)
+
+		fmt.Println("📊 IMPACT SUMMARY")
+		fmt.Println(strings.Repeat("-", 60))
+		fmt.Printf("Commits Affected:  %d\n", len(report.CommitsAffected))
+		fmt.Printf("Developers:        %d (%s)\n", len(report.AuthorsInvolved), strings.Join(report.AuthorsInvolved, ", "))
+		fmt.Printf("Files Affected:    %d\n", len(report.FilesAffected))
+		fmt.Printf("Branches:          %d (%s)\n", len(report.BranchesFound), strings.Join(report.BranchesFound, ", "))
+		fmt.Printf("Public Exposure:   %v\n", report.PublicExposure)
+		fmt.Printf("Production Use:    %v\n\n", report.ProductionUse)
+
+		fmt.Println("📁 AFFECTED FILES")
+		fmt.Println(strings.Repeat("-", 60))
+		for _, file := range report.FilesAffected {
+			fmt.Printf("  - %s\n", file)
+		}
+
+		fmt.Println("\n🔧 RECOMMENDATIONS")
+		fmt.Println(strings.Repeat("-", 60))
+		for i, rec := range report.Recommendations {
+			fmt.Printf("%d. %s\n", i+1, rec)
+		}
+
+		// JSON output option
+		if outputFormat == "json" {
+			jsonData, _ := json.MarshalIndent(report, "", "  ")
+			fmt.Println("\n" + string(jsonData))
+		}
+
+		return nil
+	},
+}
+
+// Timeline Command
+var timelineCmd = &cobra.Command{
+	Use:   "timeline [secret] [repo]",
+	Short: "Reconstruct the timeline of a secret's exposure",
+	Long: `Reconstruct the timeline of a secret's exposure in a git repository.
+
+Shows the complete lifecycle from first commit to present, including all events.
+
+Examples:
+  secagent timeline AKIAIOSFODNN7EXAMPLE .
+  secagent timeline ghp_abc123 ./my-repo`,
+	Args: cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		secret := args[0]
+		repoPath := args[1]
+
+		if repoPath == "." {
+			var err error
+			repoPath, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
+			}
+		}
+
+		report, err := timeline.Reconstruct(repoPath, secret)
+		if err != nil {
+			return fmt.Errorf("timeline reconstruction failed: %w", err)
+		}
+
+		// Print report
+		fmt.Println("\n📅 SECRET TIMELINE")
+		fmt.Println(strings.Repeat("=", 60))
+		fmt.Printf("Secret Type:    %s\n", report.SecretType)
+		fmt.Printf("Total Duration: %d days\n", report.TotalDays)
+		fmt.Printf("Total Events:   %d\n", report.EventCount)
+		fmt.Printf("Critical:       %d | Warnings: %d\n\n", report.CriticalCount, report.WarningCount)
+
+		fmt.Println("📜 EVENTS (chronological)")
+		fmt.Println(strings.Repeat("-", 60))
+		
+		for _, event := range report.Events {
+			icon := "  "
+			switch event.Severity {
+			case "critical":
+				icon = "🔴"
+			case "warning":
+				icon = "⚠️ "
+			default:
+				icon = "  "
+			}
+
+			fmt.Printf("%s %s  %s\n", icon, event.Timestamp.Format("2006-01-02 15:04"), event.Description)
+			
+			if event.Author != "" {
+				fmt.Printf("    Author: %s\n", event.Author)
+			}
+			if event.File != "" {
+				fmt.Printf("    File: %s\n", event.File)
+			}
+			if event.Commit != "" {
+				fmt.Printf("    Commit: %s\n", event.Commit)
+			}
+			if event.Branch != "" {
+				fmt.Printf("    Branch: %s\n", event.Branch)
+			}
+			fmt.Println()
+		}
+
+		// JSON output option
+		if outputFormat == "json" {
+			jsonData, _ := json.MarshalIndent(report, "", "  ")
+			fmt.Println("\n" + string(jsonData))
+		}
+
+		return nil
+	},
+}
