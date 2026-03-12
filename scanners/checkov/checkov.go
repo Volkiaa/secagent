@@ -178,6 +178,7 @@ func (s *CheckovScanner) parseFindings(failedChecks []checkovFinding) []types.Fi
 				Line: startLine,
 			},
 			Evidence: evidence,
+			CheckID:  finding.CheckID,
 			CWE:      s.extractCWE(finding.Guideline),
 			Fix:      s.generateFix(finding),
 			References: []string{

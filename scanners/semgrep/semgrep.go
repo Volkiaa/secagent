@@ -182,6 +182,7 @@ func (s *SemgrepScanner) Scan(ctx context.Context, target string) ([]types.Findi
 				Column: finding.Start.Column,
 			},
 			Evidence:   finding.Extra.Lines,
+			CheckID:    finding.CheckID,
 			CWE:        cwe,
 			Fix:        finding.Extra.Fix,
 			References: references,

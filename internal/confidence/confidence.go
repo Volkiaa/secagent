@@ -94,17 +94,20 @@ func isProductionFile(filePath string) bool {
 // isPlaceholder checks if evidence looks like a placeholder
 func isPlaceholder(evidence string) bool {
 	placeholderPatterns := []string{
-		`(?i)^foo(bar|baz)?`,
-		`(?i)^test`,
+		`(?i)^foo(bar|baz)?$`,      // foo, foobar, foobaz
+		`(?i)^foo`,                  // starts with foo
+		`(?i)^test`,                 // starts with test
 		`(?i)^placeholder`,
 		`(?i)^example`,
 		`(?i)^your_`,
-		`(?i)^xxx+`,
+		`(?i)^xxx+$`,
 		`(?i)^abc123`,
 		`(?i)^changeme`,
 		`(?i)^todo`,
-		`0123456789abcdef`, // Common test hex
-		`GK0123456789`,     // Common test key prefix
+		`^0123456789abcdef`,        // Common test hex
+		`^GK0123456789`,            // Common test key prefix
+		`^[a-f0-9]{32,}$`,          // Long hex strings (test keys)
+		`^[a-f0-9]{64}$`,           // 64-char hex (test secrets)
 	}
 
 	for _, pattern := range placeholderPatterns {

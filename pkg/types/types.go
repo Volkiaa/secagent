@@ -53,6 +53,7 @@ type Finding struct {
 	Description     string                 `json:"description"`
 	Location        Location               `json:"location"`
 	Evidence        string                 `json:"evidence,omitempty"`
+	CheckID         string                 `json:"check_id,omitempty"`         // Scanner-specific rule ID
 	CVE             string                 `json:"cve,omitempty"`
 	CWE             string                 `json:"cwe,omitempty"`
 	CVSS            float64                `json:"cvss,omitempty"`

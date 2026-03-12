@@ -2,6 +2,8 @@ package confidence
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/secagent/secagent/pkg/types"
@@ -76,18 +78,28 @@ func AnalyzeFinding(finding types.Finding) TriageResult {
 	switch finding.Scanner {
 	case "gitleaks":
 		if isPlaceholder(finding.Evidence) {
+			result.ConfidenceScore = ConfidenceVeryLow
+			result.ShouldIgnore = true
 			result.Suggestion = "Test fixture - safe to ignore"
 		} else if isTestFile(finding.Location.File) {
-			result.Suggestion = "Test file secret - verify if real"
+			result.ConfidenceScore = ConfidenceLow
+			result.Suggestion = "Test file secret - likely placeholder"
 		} else {
 			result.Suggestion = "ROTATE IMMEDIATELY if real"
 		}
 		
 	case "semgrep":
-		if strings.Contains(finding.Location.File, ".py") {
-			if strings.Contains(finding.Evidence, "LiteralString") {
+		// Check for SQL injection rules
+		if strings.Contains(finding.CheckID, "sqlalchemy") || 
+		   strings.Contains(finding.CheckID, "sql-injection") ||
+		   strings.Contains(finding.CheckID, "raw-query") {
+			// Check if file uses LiteralString (type-safe)
+			if hasTypeSafeSQL(finding.Location.File) {
+				result.ConfidenceScore = ConfidenceVeryLow
 				result.ShouldIgnore = true
-				result.Suggestion = "Type-safe code - false positive"
+				result.Suggestion = "Type-safe SQL (LiteralString) - false positive"
+			} else {
+				result.Suggestion = "Review SQL query for injection"
 			}
 		}
 		
@@ -96,6 +108,7 @@ func AnalyzeFinding(finding types.Finding) TriageResult {
 		
 	case "checkov":
 		if isTestFile(finding.Location.File) {
+			result.ConfidenceScore = ConfidenceLow
 			result.Suggestion = "Test infrastructure - low priority"
 		}
 	}
@@ -119,6 +132,47 @@ func hasUserInput(finding types.Finding) bool {
 	}
 	
 	return false
+}
+
+// hasTypeSafeSQL checks if a Python file uses LiteralString for SQL queries
+func hasTypeSafeSQL(filePath string) bool {
+	if !strings.HasSuffix(filePath, ".py") {
+		return false
+	}
+	
+	// Read the file and check for LiteralString usage
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false
+	}
+	
+	content := string(data)
+	
+	// Check if file imports LiteralString
+	if !strings.Contains(content, "LiteralString") {
+		return false
+	}
+	
+	// Check if it's used in function signatures (type hints)
+	// Pattern: def func(..., param: LiteralString, ...)
+	typeSafePatterns := []string{
+		": LiteralString",
+		": typing.LiteralString",
+		"-> LiteralString",
+	}
+	
+	for _, pattern := range typeSafePatterns {
+		if strings.Contains(content, pattern) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// getFileExtension returns the file extension
+func getFileExtension(filePath string) string {
+	return strings.ToLower(filepath.Ext(filePath))
 }
 
 // PrintTriageSummary prints a summary of triage results

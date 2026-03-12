@@ -144,7 +144,9 @@ func (s *GitleaksScanner) Scan(ctx context.Context, target string) ([]types.Find
 				Column: finding.StartColumn,
 			},
 			Evidence: s.redactSecret(finding.Match),
+			CheckID:  finding.RuleID,
 			Fix:      "Remove the secret from the code and rotate it immediately if it was committed",
+			Confidence: s.parseConfidence(finding.Entropy),
 			Metadata: map[string]interface{}{
 				"rule_id":  finding.RuleID,
 				"entropy":  finding.Entropy,
@@ -152,7 +154,6 @@ func (s *GitleaksScanner) Scan(ctx context.Context, target string) ([]types.Find
 				"commit":   finding.Commit,
 				"redacted": true,
 			},
-			Confidence: s.parseConfidence(finding.Entropy),
 		}
 		findings = append(findings, f)
 	}
