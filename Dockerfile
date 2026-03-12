@@ -5,7 +5,7 @@ FROM golang:1.22-bookworm
 
 LABEL maintainer="secagent-team"
 LABEL description="Developer-First Security Scanner - 5-in-1 unified security scanning"
-LABEL version="0.4.1"
+LABEL version="0.4.2"
 
 # Install Python and pip for semgrep/checkov
 RUN apt-get update && apt-get install -y --no-install-recommends \
