@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/secagent/secagent/internal/cache"
 	"github.com/secagent/secagent/internal/dedup"
@@ -86,20 +88,47 @@ func (o *Orchestrator) Scan(ctx context.Context, target string) (types.ScanResul
 	// Create result
 	result := output.NewScanResult(target)
 
-	// Use errgroup for parallel execution
+	// Use errgroup for parallel execution with concurrency limit
 	g, ctx := errgroup.WithContext(ctx)
+	
+	// Limit concurrency to number of CPUs to avoid resource exhaustion
+	maxConcurrent := runtime.NumCPU()
+	if maxConcurrent > 4 {
+		maxConcurrent = 4 // Cap at 4 for I/O-bound scanners
+	}
+	sem := semaphore.NewWeighted(int64(maxConcurrent))
 
 	// Channel to collect results
 	resultChan := make(chan ScannerResult, len(enabledScanners))
 
-	// Start all scanners in parallel
+	// Start all scanners in parallel with concurrency limit
 	for _, scanner := range enabledScanners {
 		scanner := scanner // capture for closure
+		
+		// Acquire semaphore
+		if err := sem.Acquire(ctx, 1); err != nil {
+			resultChan <- ScannerResult{
+				Scanner: scanner.Name(),
+				Error:   err,
+			}
+			continue
+		}
+		
 		g.Go(func() error {
+			defer sem.Release(1)
+			
 			scannerName := scanner.Name()
+			
+			// Print progress in verbose mode
+			if o.config != nil && o.config.Output.Verbose {
+				fmt.Printf("  [%s] Starting scan...\n", scannerName)
+			}
 			
 			// Check if scanner is available
 			if err := scanner.Check(); err != nil {
+				if o.config != nil && o.config.Output.Verbose {
+					fmt.Printf("  [%s] Not available: %v\n", scannerName, err)
+				}
 				resultChan <- ScannerResult{
 					Scanner: scannerName,
 					Error:   err,
@@ -109,6 +138,9 @@ func (o *Orchestrator) Scan(ctx context.Context, target string) (types.ScanResul
 
 			// Try to get from cache first
 			if cachedFindings, ok := o.cache.Get(scanTarget, scannerName); ok {
+				if o.config != nil && o.config.Output.Verbose {
+					fmt.Printf("  [%s] Cache hit ✓\n", scannerName)
+				}
 				resultChan <- ScannerResult{
 					Scanner:  scannerName,
 					Findings: cachedFindings,
@@ -118,11 +150,22 @@ func (o *Orchestrator) Scan(ctx context.Context, target string) (types.ScanResul
 			}
 
 			// Run the scan
+			if o.config != nil && o.config.Output.Verbose {
+				fmt.Printf("  [%s] Scanning...\n", scannerName)
+			}
 			findings, err := scanner.Scan(ctx, scanTarget)
 			
 			// Cache the results if successful
 			if err == nil && len(findings) > 0 {
 				o.cache.Set(scanTarget, scannerName, findings)
+			}
+			
+			if o.config != nil && o.config.Output.Verbose {
+				if err != nil {
+					fmt.Printf("  [%s] Error: %v\n", scannerName, err)
+				} else {
+					fmt.Printf("  [%s] Found %d issues\n", scannerName, len(findings))
+				}
 			}
 			
 			resultChan <- ScannerResult{
