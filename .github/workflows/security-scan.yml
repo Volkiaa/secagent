@@ -25,19 +25,41 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Download secagent
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+      
+      - name: Build secagent
         run: |
-          curl -sL https://github.com/secagent/secagent/releases/latest/download/secagent-linux-amd64 -o secagent
+          go mod download
+          go build -o secagent ./cmd/secagent
           chmod +x secagent
           sudo mv secagent /usr/local/bin/
       
-      - name: Download SARIF converter
+      - name: Install scanners
         run: |
-          curl -sL https://raw.githubusercontent.com/secagent/secagent/main/scripts/json-to-sarif.py -o json-to-sarif.py
+          # Install osv-scanner
+          curl -sSL https://raw.githubusercontent.com/google/osv-scanner/main/install.sh | bash
+          
+          # Install gitleaks
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks-linux-amd64 \
+            -o /tmp/gitleaks && chmod +x /tmp/gitleaks && sudo mv /tmp/gitleaks /usr/local/bin/
+          
+          # Install semgrep
+          pip install semgrep
+          
+          # Install trivy
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          
+          # Install checkov
+          pip install checkov
       
       - name: Run secagent scan
         run: |
           secagent scan --all . --format json --output secagent-results.json
+          cat secagent-results.json
       
       - name: Upload JSON results
         uses: actions/upload-artifact@v4
@@ -46,18 +68,6 @@ jobs:
           name: secagent-results
           path: secagent-results.json
           retention-days: 30
-      
-      - name: Convert to SARIF
-        if: always()
-        run: |
-          python3 json-to-sarif.py secagent-results.json secagent-results.sarif
-      
-      - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: secagent-results.sarif
-        continue-on-error: true
       
       - name: Print summary
         if: always()
