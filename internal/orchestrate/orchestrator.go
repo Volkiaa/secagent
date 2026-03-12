@@ -3,12 +3,14 @@ package orchestrate
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/secagent/secagent/internal/cache"
 	"github.com/secagent/secagent/internal/dedup"
 	"github.com/secagent/secagent/internal/diff"
 	"github.com/secagent/secagent/internal/filter"
@@ -21,6 +23,7 @@ import (
 type Orchestrator struct {
 	registry    *scanners.Registry
 	config      *types.Config
+	cache       *cache.Cache
 	findings    []types.Finding
 	errors      []string
 	mu          sync.Mutex
@@ -36,9 +39,24 @@ type ScannerResult struct {
 
 // NewOrchestrator creates a new orchestrator with the given registry
 func NewOrchestrator(registry *scanners.Registry, config *types.Config) *Orchestrator {
+	// Initialize cache
+	var c *cache.Cache
+	if config != nil && config.Cache.Enabled {
+		home, _ := os.UserHomeDir()
+		cacheDir := filepath.Join(home, ".secagent", "cache")
+		ttl := "24h"
+		if config.Cache.TTL != "" {
+			ttl = config.Cache.TTL
+		}
+		c, _ = cache.New(cacheDir, true, ttl)
+	} else {
+		c, _ = cache.New("", false, "24h")
+	}
+	
 	return &Orchestrator{
 		registry: registry,
 		config:   config,
+		cache:    c,
 		findings: make([]types.Finding, 0),
 		errors:   make([]string, 0),
 	}
@@ -78,19 +96,37 @@ func (o *Orchestrator) Scan(ctx context.Context, target string) (types.ScanResul
 	for _, scanner := range enabledScanners {
 		scanner := scanner // capture for closure
 		g.Go(func() error {
+			scannerName := scanner.Name()
+			
 			// Check if scanner is available
 			if err := scanner.Check(); err != nil {
 				resultChan <- ScannerResult{
-					Scanner: scanner.Name(),
+					Scanner: scannerName,
 					Error:   err,
 				}
 				return nil // Don't fail the group, just report the error
 			}
 
+			// Try to get from cache first
+			if cachedFindings, ok := o.cache.Get(scanTarget, scannerName); ok {
+				resultChan <- ScannerResult{
+					Scanner:  scannerName,
+					Findings: cachedFindings,
+					Error:    nil,
+				}
+				return nil
+			}
+
 			// Run the scan
 			findings, err := scanner.Scan(ctx, scanTarget)
+			
+			// Cache the results if successful
+			if err == nil && len(findings) > 0 {
+				o.cache.Set(scanTarget, scannerName, findings)
+			}
+			
 			resultChan <- ScannerResult{
-				Scanner:  scanner.Name(),
+				Scanner:  scannerName,
 				Findings: findings,
 				Error:    err,
 			}

@@ -13,8 +13,8 @@ secagent.test
 *.test
 *.out
 
-# Cache
-cache/
+# Cache (but not internal/cache package)
+/cache/
 *.cache
 
 # Logs
