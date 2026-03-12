@@ -36,6 +36,7 @@ jobs:
         run: |
           pwd
           ls -la
+          cd ${{ github.workspace }}
           go mod download
           go build -o secagent ./cmd/secagent
           chmod +x secagent
