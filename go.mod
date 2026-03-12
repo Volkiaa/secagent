@@ -1,6 +1,6 @@
 module github.com/secagent/secagent
 
-go 1.22
+go 1.23
 
 require (
 	github.com/spf13/cobra v1.10.2

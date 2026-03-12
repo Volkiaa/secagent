@@ -1,7 +1,7 @@
 # secagent - All-in-One Security Scanner
 # Includes: secagent + osv-scanner + gitleaks + semgrep + trivy + checkov
 
-FROM golang:1.22-bookworm
+FROM golang:1.23-bookworm
 
 LABEL maintainer="secagent-team"
 LABEL description="Developer-First Security Scanner - 5-in-1 unified security scanning"
